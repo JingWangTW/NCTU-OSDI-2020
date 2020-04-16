@@ -43,6 +43,9 @@ void exec_controller_el1 ( )
         case PRINT_TIMESTAMP_EL0:
             print_current_timestamp ();
             break;
+        case UART_IRQ_ENABLE:
+            enable_uart_interrupt();
+            break;
         default:
             print_exec_info ( EL1, elr, esr );
             break;

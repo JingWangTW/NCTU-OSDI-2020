@@ -47,4 +47,15 @@
 #define GPPUDCLK0       ((volatile unsigned int*)(MMIO_BASE+0x00200098))
 #define GPPUDCLK1       ((volatile unsigned int*)(MMIO_BASE+0x0020009C))
 
+
+/* https://cs140e.sergio.bz/docs/BCM2837-ARM-Peripherals.pdf p.177 */
+#define GPU_IRQ_PENDING_BASIC   ((volatile unsigned int*)(MMIO_BASE+0x0000B200))
+#define GPU_IRQ_PENDING_1       ((volatile unsigned int*)(MMIO_BASE+0x0000B204))
+#define GPU_IRQ_PENDING_2       ((volatile unsigned int*)(MMIO_BASE+0x0000B208))
+#define GPU_IRQ_ENABLE_1        ((volatile unsigned int*)(MMIO_BASE+0x0000B210))
+#define GPU_IRQ_ENABLE_2        ((volatile unsigned int*)(MMIO_BASE+0x0000B214))
+#define GPU_IRQ_DISABLE_1       ((volatile unsigned int*)(MMIO_BASE+0x0000B21C))
+#define GPU_IRQ_DISABLE_2       ((volatile unsigned int*)(MMIO_BASE+0x0000B220))
+
+
 #endif

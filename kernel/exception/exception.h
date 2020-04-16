@@ -10,6 +10,7 @@
 #define SYS_CALL_CORE_TIMER_ENABLE      "svc #5;"
 #define SYS_CALL_CORE_TIMER_DISABLE     "svc #6;"
 #define SYS_CALL_PRINT_TIMESTAMP_EL0    "svc #7;"
+#define SYS_CALL_UART_IRQ_ENABLE        "svc #8;"
 
 #define HYPERVISORE_CALL_TEST_HVC       "hvc #2;"
 
@@ -18,12 +19,13 @@
 // used by both sys call and hypervisor call
 enum system_call {
     TEST_SVC = 1,
-    TEST_HVC,
-    IRQ_EL1_ENABLE,
-    IRQ_EL1_DISABLE,
-    CORE_TIMER_ENABLE,
-    CORE_TIMER_DISABLE,
-    PRINT_TIMESTAMP_EL0,
+    TEST_HVC = 2,
+    IRQ_EL1_ENABLE = 3,
+    IRQ_EL1_DISABLE = 4,
+    CORE_TIMER_ENABLE = 5,
+    CORE_TIMER_DISABLE = 6,
+    PRINT_TIMESTAMP_EL0 = 7,
+    UART_IRQ_ENABLE = 8,
 };
 
 enum exception_level {

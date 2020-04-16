@@ -25,6 +25,7 @@
 #include "lib/ctype.h"
 #include "lib/stdarg.h"
 #include "lib/string.h"
+#include "kernel/exception/exception.h"
 
 #include "gpio.h"
 #include "mailbox.h"
@@ -70,7 +71,10 @@ void uart_init()
     *UART_LCRH = 0b11<<5;       /* 8n1 */
     *UART_CR = 0x301;           /* enable Tx, Rx, FIFO */
 
-    //uart_flush();
+    // enable interrupt
+    *UART_IMSC = 3 << 4;		/* Tx, Rx */
+
+    write_buf.rear = write_buf.head = read_buf.head = read_buf.rear = 0;
 }
 
 /**
@@ -78,25 +82,19 @@ void uart_init()
  */
 void uart_send(unsigned int c)
 {
-    /* Wait until we can send */
-    do {
-        
-        asm volatile("nop");
+    char r;
 
-    } while( *UART_FR&0x20 );
-    
-    /* write the character to the buffer */   
-    *UART_DR = c;
+    uart_push( WRITE, c);
 
-    if ( c == '\n' ) 
+    if ( c == '\n' )
+        uart_push( WRITE, '\r' );
+
+    // if rpi is free now 
+    // send to it
+    if (*UART_FR & 0x80)
     {
-        do {
-            
-            asm volatile("nop");
-
-        } while( *UART_FR&0x20 );
-        
-        *UART_DR = '\r';
+        r = uart_pop ( WRITE );
+        *UART_DR = r;
     }
 }
 
@@ -137,18 +135,17 @@ void uart_send_float ( float f, int field_length )
 char uart_getc()
 {
     char r;
+
+    while ( 1 )
+    {
+        r = uart_pop ( READ );
+
+        if ( r == -1 )
+            asm volatile ("wfi");
+        else
+            break;
+    }
     
-    /* wait until something is in the buffer */
-    do{
-        
-        asm volatile("nop");
-        
-    } while ( *UART_FR&0x10 );
-
-    /* read it and return */
-    r = ( char )( *UART_DR );
-
-    /* convert carrige return to newline */
     return r == '\r' ? '\n' : r;
 }
 
@@ -252,4 +249,55 @@ void uart_printf ( const char * format, ... )
         temp ++;
 
     } while ( *temp != '\0');
+}
+
+void enable_uart_interrupt ()
+{
+    *GPU_IRQ_ENABLE_1 = 1 << 25;
+}
+
+void disable_uart_interrupt ()
+{
+    *GPU_IRQ_DISABLE_1 = 1 << 25;
+}
+
+void uart_push ( UART_MODE mode, char c )
+{
+    if ( mode == READ )
+    {
+        read_buf.buf[(read_buf.rear) ++] = c;
+    }
+    else if ( mode == WRITE )
+    {
+        write_buf.buf[(write_buf.rear) ++] = c;
+    }
+}
+
+char uart_pop ( UART_MODE mode )
+{
+    struct uart_buf * buf;
+
+    if ( mode == READ )
+    {
+        buf = &read_buf;
+    }
+    else if ( mode == WRITE )
+    {
+        buf = &write_buf;
+    }
+    else
+    {
+        return -1;
+    }
+
+    if ( buf -> rear != buf -> head )
+    {
+        return buf->buf[(buf->head) ++];
+    }
+    else
+    {
+        // buf is clear, reset flag
+        buf -> head = buf -> rear = 0;
+        return -1;
+    }
 }
