@@ -22,57 +22,59 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
+#include "uart.h"
+
+#include "kernel/exception/exception.h"
+
 #include "lib/ctype.h"
 #include "lib/stdarg.h"
 #include "lib/string.h"
-#include "kernel/exception/exception.h"
 
 #include "gpio.h"
 #include "mailbox.h"
-#include "uart.h"
 
 /**
  * Set baud rate and characteristics (115200 8N1) and map to GPIO
  */
-void uart_init()
+void uart_init ( )
 {
     register unsigned int reg;
 
     /*  turn off UART0 */
-    *UART_CR = 0;         
+    *UART_CR = 0;
 
-    mbox_set_clock_to_PL011();
+    mbox_set_clock_to_PL011 ( );
 
     /* map UART0 to GPIO pins */
-    reg  = *GPFSEL1;
-    reg &= ~((7<<12)|(7<<15));  /* address of gpio 14, 15 */
-    reg |=   (4<<12)|(4<<15);   /* set to alt0 */
+    reg = *GPFSEL1;
+    reg &= ~( ( 7 << 12 ) | ( 7 << 15 ) ); /* address of gpio 14, 15 */
+    reg |= ( 4 << 12 ) | ( 4 << 15 );      /* set to alt0 */
 
     *GPFSEL1 = reg;
-    *GPPUD = 0;                 /* enable gpio 14 and 15 */
-    reg = 150;
+    *GPPUD   = 0; /* enable gpio 14 and 15 */
+    reg      = 150;
     while ( reg-- )
     {
-        asm volatile("nop"); 
+        asm volatile( "nop" );
     }
 
-    *GPPUDCLK0 = (1<<14)|(1<<15);
-    reg = 150;
+    *GPPUDCLK0 = ( 1 << 14 ) | ( 1 << 15 );
+    reg        = 150;
     while ( reg-- )
     {
-        asm volatile("nop");
+        asm volatile( "nop" );
     }
-    
-    *GPPUDCLK0 = 0;             /* flush GPIO setup */
 
-    *UART_ICR = 0x7FF;          /* clear interrupts */
-    *UART_IBRD = 2;             /* 115200 baud */
+    *GPPUDCLK0 = 0; /* flush GPIO setup */
+
+    *UART_ICR  = 0x7FF; /* clear interrupts */
+    *UART_IBRD = 2;     /* 115200 baud */
     *UART_FBRD = 0xB;
-    *UART_LCRH = 0b11<<5;       /* 8n1 */
-    *UART_CR = 0x301;           /* enable Tx, Rx, FIFO */
+    *UART_LCRH = 0b11 << 5; /* 8n1 */
+    *UART_CR   = 0x301;     /* enable Tx, Rx, FIFO */
 
     // enable interrupt
-    *UART_IMSC = 3 << 4;		/* Tx, Rx */
+    *UART_IMSC = 3 << 4; /* Tx, Rx */
 
     write_buf.rear = write_buf.head = read_buf.head = read_buf.rear = 0;
 }
@@ -80,20 +82,20 @@ void uart_init()
 /**
  * Send a character
  */
-void uart_send(unsigned int c)
+void uart_send ( unsigned int c )
 {
     char r;
 
-    uart_push( WRITE, c);
+    uart_push ( WRITE, c );
 
     if ( c == '\n' )
-        uart_push( WRITE, '\r' );
+        uart_push ( WRITE, '\r' );
 
-    // if rpi is free now 
+    // if rpi is free now
     // send to it
-    if (*UART_FR & 0x80)
+    if ( *UART_FR & 0x80 )
     {
-        r = uart_pop ( WRITE );
+        r        = uart_pop ( WRITE );
         *UART_DR = r;
     }
 }
@@ -101,21 +103,21 @@ void uart_send(unsigned int c)
 /**
  * Send a integer
  */
-void uart_send_int ( int c, int field_length, int base)
+void uart_send_int ( int c, int field_length, int base )
 {
     char buffer[20];
 
     switch ( base )
     {
         case 10:
-            itoa( c, buffer, field_length );
+            itoa ( c, buffer, field_length );
             break;
         case 16:
-            itohex_str ( c, sizeof(int), buffer );
+            itohex_str ( c, sizeof ( int ), buffer );
             break;
     }
-    
-    uart_puts( buffer );
+
+    uart_puts ( buffer );
 }
 
 /**
@@ -125,49 +127,47 @@ void uart_send_float ( float f, int field_length )
 {
     char buffer[20];
     ftoa ( f, buffer, 6 );
-    uart_puts( buffer );
+    uart_puts ( buffer );
 }
-
 
 /**
  * Receive a character
  */
-char uart_getc()
+char uart_getc ( )
 {
-    char r;
+    int r;
 
     while ( 1 )
     {
         r = uart_pop ( READ );
 
         if ( r == -1 )
-            asm volatile ("wfi");
+            asm volatile( "wfi" );
         else
             break;
     }
-    
+
     return r == '\r' ? '\n' : r;
 }
 
 /**
  * Receive a integer
  */
-int uart_getint()
+int uart_getint ( )
 {
     int input, output;
 
     output = 0;
-    
-    while ( 1 ) 
+
+    while ( 1 )
     {
-        input = uart_getc();
-        uart_send(input);
+        input = uart_getc ( );
+        uart_send ( input );
 
         if ( !isdigit ( input ) )
             break;
 
-        output = output * 10 + (input - '0');
-        
+        output = output * 10 + ( input - '0' );
     }
 
     return output;
@@ -176,11 +176,11 @@ int uart_getint()
 /**
  * Display a string
  */
-void uart_puts(char *s)
+void uart_puts ( char * s )
 {
-    while( *s )
+    while ( *s )
     {
-        uart_send(*s++);
+        uart_send ( *s++ );
     }
 }
 
@@ -190,7 +190,7 @@ void uart_printf ( const char * format, ... )
     int field_length;
     int d;
     char c;
-    char *s;
+    char * s;
     float f;
     va_list arguments;
 
@@ -200,19 +200,19 @@ void uart_printf ( const char * format, ... )
     {
         if ( *temp == '%' )
         {
-            temp ++;
+            temp++;
 
             // field length
             field_length = 0;
-            if (isdigit(*temp))
+            if ( isdigit ( *temp ) )
             {
-                field_length = * temp;
+                field_length = *temp;
 
-                while ( isdigit(*temp) ) 
+                while ( isdigit ( *temp ) )
                 {
                     field_length *= 10;
-                    field_length += (*temp);
-                    temp ++;
+                    field_length += ( *temp );
+                    temp++;
                 }
             }
 
@@ -221,7 +221,7 @@ void uart_printf ( const char * format, ... )
             {
                 case 'd':
                     d = va_arg ( arguments, int );
-                    uart_send_int( d, field_length, 10 );
+                    uart_send_int ( d, field_length, 10 );
                     break;
                 case 's':
                     s = va_arg ( arguments, char * );
@@ -232,8 +232,8 @@ void uart_printf ( const char * format, ... )
                     uart_send ( c );
                     break;
                 case 'x':
-                    d = va_arg ( arguments, int ); 
-                    uart_send_int( d, field_length, 16 );
+                    d = va_arg ( arguments, int );
+                    uart_send_int ( d, field_length, 16 );
                     break;
                 case 'f':
                     f = va_arg ( arguments, double );
@@ -243,37 +243,37 @@ void uart_printf ( const char * format, ... )
         }
         else
         {
-            uart_send( *temp );
+            uart_send ( *temp );
         }
 
-        temp ++;
+        temp++;
 
-    } while ( *temp != '\0');
+    } while ( *temp != '\0' );
 }
 
-void enable_uart_interrupt ()
+void enable_uart_interrupt ( )
 {
-    *GPU_IRQ_ENABLE_1 = 1 << 25;
+    *GPU_IRQ_ENABLE_2 = 1 << 25;
 }
 
-void disable_uart_interrupt ()
+void disable_uart_interrupt ( )
 {
-    *GPU_IRQ_DISABLE_1 = 1 << 25;
+    *GPU_IRQ_DISABLE_2 = 1 << 25;
 }
 
 void uart_push ( UART_MODE mode, char c )
 {
     if ( mode == READ )
     {
-        read_buf.buf[(read_buf.rear) ++] = c;
+        read_buf.buf[( read_buf.rear )++] = c;
     }
     else if ( mode == WRITE )
     {
-        write_buf.buf[(write_buf.rear) ++] = c;
+        write_buf.buf[( write_buf.rear )++] = c;
     }
 }
 
-char uart_pop ( UART_MODE mode )
+int uart_pop ( UART_MODE mode )
 {
     struct uart_buf * buf;
 
@@ -290,14 +290,14 @@ char uart_pop ( UART_MODE mode )
         return -1;
     }
 
-    if ( buf -> rear != buf -> head )
+    if ( buf->rear != buf->head )
     {
-        return buf->buf[(buf->head) ++];
+        return buf->buf[( buf->head )++];
     }
     else
     {
         // buf is clear, reset flag
-        buf -> head = buf -> rear = 0;
+        buf->head = buf->rear = 0;
         return -1;
     }
 }
