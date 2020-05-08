@@ -8,7 +8,7 @@
 
 /* defined in io.S */
 extern void uart_write ( char * s );
-extern char uart_read ( );
+extern int uart_read ( );
 
 /* function that are not public ourside */
 void buffer_enqueue ( const char * str );
@@ -151,11 +151,12 @@ int printf ( const char * format, ... )
 char * gets ( char * str )
 {
     int i = 0;
-    char c;
+    int c;
 
     while ( 1 )
     {
-        c        = uart_read ( );
+        while ( ( c = uart_read ( ) ) != -1 )
+            ;
         str[i++] = c;
 
         if ( c == '\n' )

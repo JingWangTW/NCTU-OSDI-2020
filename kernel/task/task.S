@@ -20,7 +20,9 @@ run_init_task:
 
     # create main
     ldr      x0,     =main      // where the acutally main is
-    bl      task_create         // create "main" task
+    bl       task_create        // create "main" task
+
+    bl      uart_init
 
     # start from init, which will start to scheduling
     bl      launch_init  

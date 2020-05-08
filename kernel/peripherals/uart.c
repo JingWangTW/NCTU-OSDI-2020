@@ -8,6 +8,7 @@
 
 #include "gpio.h"
 #include "mailbox.h"
+#include "uart_queue.h"
 
 /* Set baud rate and characteristics (115200 8N1) and map to GPIO */
 void uart_init ( )
@@ -45,33 +46,28 @@ void uart_init ( )
     *UART_IBRD = 2;     /* 115200 baud */
     *UART_FBRD = 0xB;
     *UART_LCRH = 0b11 << 5; /* 8n1 */
-    *UART_CR   = 0x301;     /* enable Tx, Rx, FIFO */
+    *UART_CR   = 0x301;     /* enable Tx, Rx, disable FIFO */
 
-    // uart_flush();
+    *UART_IMSC = 1 << 5; /* enable irq in Tx, Rx */
+
+    uart_queue_init ( );
 }
 
 /* Send a character */
 void uart_send ( unsigned int c )
 {
-    /* Wait until we can send */
-    do
-    {
-        asm volatile( "nop" );
-
-    } while ( *UART_FR & 0x20 );
-
-    /* write the character to the buffer */
-    *UART_DR = c;
+    char r;
+    uart_enqueue ( &UART_WRITE_QUEUE, c );
 
     if ( c == '\n' )
+        uart_enqueue ( &UART_WRITE_QUEUE, '\r' );
+
+    // if rpi is free now
+    // send to it
+    if ( *UART_FR & 0x80 )
     {
-        do
-        {
-            asm volatile( "nop" );
-
-        } while ( *UART_FR & 0x20 );
-
-        *UART_DR = '\r';
+        r        = uart_dequeue ( &UART_WRITE_QUEUE );
+        *UART_DR = r;
     }
 }
 
@@ -97,6 +93,21 @@ char uart_getc ( )
     /* convert carrige return to newline */
     return r;
 }
+// int uart_getc ( )
+// {
+//     int r;
+//
+//     r = uart_dequeue ( &UART_READ_QUEUE );
+//     while ( 1 )
+//     {
+//         if ( r == -1 )
+//             asm volatile( "wfi" );
+//         else
+//             break;
+//     }
+//
+//     return r == '\r' ? '\n' : r;
+// }
 
 /* Display a string */
 void uart_puts ( char * s )

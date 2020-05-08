@@ -1,6 +1,8 @@
 #include "irq.h"
 
+#include "kernel/peripherals/gpio.h"
 #include "kernel/peripherals/uart.h"
+#include "kernel/peripherals/uart_queue.h"
 #include "kernel/task/schedule.h"
 
 #include "timer.h"
@@ -27,6 +29,40 @@ void irq_controller_el1 ( )
         sys_local_timer_reload ( );
 
         deal = 1;
+    }
+
+    // GPU IRQ Pending
+    if ( *GPU_IRQ_PENDING_BASIC & 0x1 << 19 )
+    {
+        int r;
+        unsigned int status = *UART_MIS;
+
+        // input from uart
+        // read some data
+        if ( status & 0x10 )
+        {
+            while ( *UART_FR & 0x40 )
+            {
+                // receive
+                r = (char) ( *UART_DR );
+
+                uart_enqueue ( &UART_READ_QUEUE, r );
+            }
+            *UART_ICR = status;  // Clears the UARTTXINTR interrupt
+            deal      = 1;
+        }
+        else
+        {
+            while ( ( r = uart_dequeue ( &UART_WRITE_QUEUE ) ) != -1 )
+            {
+                while ( *UART_FR & 0x20 )
+                    asm volatile( "nop" );
+                *UART_DR = r;
+            }
+
+            *UART_ICR = status;
+            deal      = 1;
+        }
     }
 
     if ( !deal )

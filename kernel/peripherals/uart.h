@@ -35,6 +35,7 @@
 #define UART_LCRH ( (volatile unsigned int *) ( MMIO_BASE + 0x0020102C ) ) /* Line Control Register */
 #define UART_CR   ( (volatile unsigned int *) ( MMIO_BASE + 0x00201030 ) ) /* Control Register */
 #define UART_IMSC ( (volatile unsigned int *) ( MMIO_BASE + 0x00201038 ) ) /* Interupt FIFO Level Select Register */
+#define UART_MIS  ( (volatile unsigned int *) ( MMIO_BASE + 0x00201040 ) ) /* Masked Interupt Status Register */
 #define UART_ICR  ( (volatile unsigned int *) ( MMIO_BASE + 0x00201044 ) ) /* Interupt Clear Register */
 
 /* Auxilary mini UART registers */
@@ -63,6 +64,7 @@ void uart_init ( );
 void uart_send ( unsigned int c );
 
 /* Receive a character */
+// int uart_getc ( );
 char uart_getc ( );
 
 /* Display a string */
