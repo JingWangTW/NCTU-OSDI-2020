@@ -12,7 +12,6 @@ uint64_t PGD_POOL_USAGE            = 0;      // usage of pgd pool
 
 // only be used in this file
 int user_page_occupied ( );
-intptr_t user_va_to_phy_addr ( page_t * pgd_rec, intptr_t va );
 int user_phy_addr_to_pfn ( intptr_t phy_addr );
 intptr_t user_pfn_to_phy_addr ( int pfn );
 
@@ -95,20 +94,21 @@ void * user_page_alloc ( page_t * pgd_rec )
     phy_page_base   = ( ( phy_addr >> PAGE_OFFSET ) << PAGE_OFFSET );
     phy_page_offset = phy_addr - phy_page_base;
 
-    // count the va
-    va |= ( ( ( uint64_t ) ( pgd_rec->pgd_used ) ) << ( PAGE_OFFSET + TABLE_BITS * 3 ) );
-    va |= ( ( ( uint64_t ) ( pgd_rec->pud_used ) ) << ( PAGE_OFFSET + TABLE_BITS * 2 ) );
-    va |= ( ( ( uint64_t ) ( pgd_rec->pmd_used ) ) << ( PAGE_OFFSET + TABLE_BITS * 1 ) );
-    va |= ( ( ( uint64_t ) ( pgd_rec->pte_used ) ) << ( PAGE_OFFSET + TABLE_BITS * 0 ) );
-    va |= phy_page_offset;
-
-    // update pte table
-    ( pgd_rec->pte )[pgd_rec->pte_used] = ( phy_page_base | USER_PTE_ATTR );
-
-    // updat the used of pte;
+    // updat the used of pte
     ( pgd_rec->pte_used )++;
 
-    memzero ( (uint64_t *) va, PAGE_SIZE );
+    // count the va
+    va |= ( ( ( uint64_t ) ( pgd_rec->pgd_used - 1 ) ) << ( PAGE_OFFSET + TABLE_BITS * 3 ) );
+    va |= ( ( ( uint64_t ) ( pgd_rec->pud_used - 1 ) ) << ( PAGE_OFFSET + TABLE_BITS * 2 ) );
+    va |= ( ( ( uint64_t ) ( pgd_rec->pmd_used - 1 ) ) << ( PAGE_OFFSET + TABLE_BITS * 1 ) );
+    va |= ( ( ( uint64_t ) ( pgd_rec->pte_used - 1 ) ) << ( PAGE_OFFSET + TABLE_BITS * 0 ) );
+    va <<= phy_page_offset;
+    va |= USER_VA_START;
+
+    // update pte table
+    ( pgd_rec->pte )[pgd_rec->pte_used - 1] = ( phy_page_base | USER_PTE_ATTR );
+
+    memzero ( (uint64_t *) ( phy_page_base | SYS_VA_START ), PAGE_SIZE );
 
     return (void *) va;
 }

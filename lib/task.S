@@ -11,7 +11,7 @@
 .global fork
 
 default_task_start:
-    blr     x19     // an user mode code 
+    br     x19     // an user mode code 
 
     # after user mode done, do this routine
     bl      exit 

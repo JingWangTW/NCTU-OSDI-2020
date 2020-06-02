@@ -97,7 +97,7 @@ void sys_do_exit ( thread_info_t * thread )
     /* mark this thread as a dead one */
     thread->state = ZOMBIE;
 
-    release_user_space ( ( (pcb_t *) thread )->user_space_index );
+    // release_user_space ( ( (pcb_t *) thread )->user_space_index );
     sys_printk ( "release user space of task %d\n", thread->task_id );
 
     sys_do_schedule ( );

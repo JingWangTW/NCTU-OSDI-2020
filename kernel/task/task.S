@@ -11,28 +11,31 @@ run_init_task:
     bl      create_idle_task    // defined in task.c
 
     # create ZOMBIE REAPER
-    ldr     x0,     =zombie_reaper
-    bl      task_create
+    # ldr     x0,     =zombie_reaper
+    # bl      task_create
 
     # set counter of zombie reaper as only 1
-    mov     x1,     #1
-    bl      set_thread_const_couner
+    # mov     x1,     #1
+    # bl      set_thread_const_couner
 
     # create main
-    ldr      x0,     =kernel_testing_main   // where the acutally main is
-    bl      task_create                     // create "main" task
+    ldr     x0,     =_binary_build_user_img_start   // where the acutally main is
+    ldr     x1,     =_binary_build_user_img_size
+    bl      task_create                             // create "main" task
 
     # start from init, which will start to scheduling
-    bl      launch_init  
+    bl      launch_main
 
     # it shall never reach
     ret
 
 # from el1 to el0
-launch_init: 
+launch_main: 
 
-    # set IDLE are going to run
-    ldr     x0,     IDLE            // IDLE would be declare in task.c
+    ldr     x1,     =THREAD_POOL;
+    add     x0,     x1,     x0,     lsl #3
+    ldr     x0,     [x0]
+
     
     msr     TPIDR_EL0, x0
 
@@ -44,11 +47,16 @@ launch_init:
     ldr     x9,     [x0, 8 * 31]    //  user sp 
     msr     SP_EL0, x9
 
-    mov     sp,     #0x70000        // move the el1 sp to the default
+    bl      set_ttbr0
+
+    mov lr, #0
+    msr  ELR_EL1, lr
+
+    # mov     sp,     #0x70000        // move the el1 sp to the default
 
     # enable el1 irq
-    bl      irq_el1_enable          // defined in irq.S
-    bl      sys_core_timer_enable   // defined in timer.c
+    # bl      irq_el1_enable          // defined in irq.S
+    # bl      sys_core_timer_enable   // defined in timer.c
 
     # and go !!
     eret

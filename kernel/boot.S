@@ -78,21 +78,18 @@ return_to_el1:
     add     sp,     x0,     LOW_MEMORY
 
     ## required 5.1: test mmu setting
-    ldr     x2, =kernel_testing_main
+    ldr     x2, =run_init_task
 
     # enable mmu, cache remains disabled, toggle the last bit to 1
     mrs     x1,     SCTLR_EL1
     orr     x1 ,    x1,     1
     msr     SCTLR_EL1, x1 
     
-    br      x2
-    b       loop
-
     # go to set up init task, and run it
-    bl      run_init_task
+    br      x2
 
-    # this shall not touched
-    bl      loop
+    # this shall not be touched
+    b       loop
 
 loop:  
     wfe

@@ -3,7 +3,7 @@ SECTIONS
     . = 0;
     
     _user_start = . ;
-
+        .text.start : {*(.text.start)}
         .text.user : { user/src/*(.text) user/lib/*(.text) }
         .rodata : { user/src/*(.rodata) user/lib/*(.rodata) }
         .data : { user/src/*(.data) user/lib/*(.data) }

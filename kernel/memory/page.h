@@ -27,5 +27,6 @@ page_t * user_pgd_alloc ( );
 void user_pgd_free ( page_t * pgd_rec );
 void * user_page_alloc ( page_t * pgd_rec );
 void user_page_free ( page_t * pgd_rec, intptr_t va );
+intptr_t user_va_to_phy_addr ( page_t * pgd_rec, intptr_t va );
 
 #endif

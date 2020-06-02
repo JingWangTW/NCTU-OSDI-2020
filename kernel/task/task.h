@@ -3,6 +3,8 @@
 
 #include "lib/type.h"
 
+#define USER_STACK_SIZE_PER_TASK ( 1 << 20 ) /* 1M bytes */
+
 typedef enum
 {
     RUNNING       = 1,
@@ -35,11 +37,14 @@ struct thread_info_t
 
     uint64_t task_id;
     task_state_t state;
-    void ( *func ) ( );
+    void * func;
 
     int64_t const_counter;
     int64_t counter;
     int64_t priority; /* at this time, all task has the same priority */
+
+    uint64_t * text_start; /* where are the text segment */
+    uint64_t text_size;    /* the length of text segment */
 };
 
 typedef struct thread_info_t thread_info_t;
@@ -49,7 +54,7 @@ extern thread_info_t * IDLE;
 extern thread_info_t * ZOMBIE_REPEAR;
 
 void create_idle_task ( );
-int task_create ( void ( *func ) ( ) );
+int task_create ( void * text_start, uint64_t text_size );
 void set_thread_const_couner ( int pid, int v );
 thread_info_t * get_thread_info ( int pid );
 thread_info_t * sys_duplicate_task ( thread_info_t * current );

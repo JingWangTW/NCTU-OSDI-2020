@@ -20,7 +20,7 @@ USER_IMAGE		= $(BUILD_DIR)/user.img
 USER_BINARY		= $(BUILD_DIR)/user.bin 
 
 USER_SRCS	= $(wildcard src/*.c) $(wildcard lib/*.c)
-USER_ASMS   = $(wildcard lib/*.S)
+USER_ASMS   = $(wildcard src/*.S) $(wildcard lib/*.S)
 USER_SRC_OBJS = $(patsubst %.c, $(USER_BUILD_DIR)/%.o, $(USER_SRCS))
 USER_ASM_OBJS = $(patsubst %.S, $(USER_BUILD_DIR)/%.S.o, $(USER_ASMS))
 USER_OBJS   = $(USER_SRC_OBJS) $(USER_ASM_OBJS)

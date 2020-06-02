@@ -1,20 +1,21 @@
-#include "lib/task.h"
+#include "task.h"
 
 #include "kernel/memory/mem.h"
+#include "kernel/memory/page.h"
 #include "kernel/peripherals/time.h"
 #include "kernel/peripherals/uart.h"
 
+#include "lib/task.h"
 #include "lib/type.h"
 
 #include "schedule.h"
-#include "task.h"
 #include "task_queue.h"
 
 thread_info_t * IDLE = NULL;
 thread_info_t * THREAD_POOL[NUM_THREADS];
 
 /* only can be used in this file */
-thread_info_t * create_thread_info ( void ( *func ) ( ) );
+thread_info_t * create_thread_info ( void * text_start, uint64_t text_end );
 
 void create_idle_task ( )
 {
@@ -33,14 +34,21 @@ void create_idle_task ( )
     IDLE->kernel_sp = idle_pcb->kernel_stack_ptr;
     IDLE->user_sp   = idle_pcb->user_stack_ptr;
 
+    int i;
+    intptr_t addr;
+    for ( i = 0; i < USER_STACK_SIZE_PER_TASK / PAGE_SIZE; i++ )
+    {
+        addr = (intptr_t) user_page_alloc ( idle_pcb->user_pgd_rec );
+    }
+
     ( IDLE->cpu_context ).x[19]        = (uint64_t *) idle;
     ( IDLE->cpu_context ).lr           = (uint64_t *) default_task_start;
-    ( IDLE->cpu_context ).user_sp      = (uint64_t *) idle_pcb->user_stack_ptr;
+    ( IDLE->cpu_context ).user_sp      = (uint64_t *) addr + PAGE_SIZE;
     ( IDLE->cpu_context ).kernel_sp    = (uint64_t *) idle_pcb->kernel_stack_ptr;
     ( IDLE->cpu_context ).user_mode_pc = (uint64_t *) default_task_start;
 }
 
-thread_info_t * create_thread_info ( void ( *func ) ( ) )
+thread_info_t * create_thread_info ( void * text_start, uint64_t text_size )
 {
     /* allocate TCB in kernel space */
     pcb_t * new_task            = (pcb_t *) allocate_pcb ( );
@@ -48,7 +56,7 @@ thread_info_t * create_thread_info ( void ( *func ) ( ) )
 
     /* init a task */
     thread_info->state         = RUNNING;
-    thread_info->func          = func;
+    thread_info->func          = ( (void ( * ) ( )) text_start );
     thread_info->priority      = 1; /* all task has the same priority */
     thread_info->const_counter = 2;
     thread_info->counter       = 2;
@@ -57,11 +65,32 @@ thread_info_t * create_thread_info ( void ( *func ) ( ) )
     thread_info->child  = NULL;
 
     thread_info->kernel_sp = new_task->kernel_stack_ptr;
-    thread_info->user_sp   = new_task->user_stack_ptr;
 
-    ( thread_info->cpu_context ).x[19]        = (uint64_t *) func;
+    thread_info->text_start = text_start;
+    thread_info->text_size  = text_size;
+
+    unsigned int i;
+    intptr_t addr;
+    // allocate page for text and data segment
+    for ( i = 0; i < text_size / PAGE_SIZE + 1; i++ )
+    {
+        addr = (intptr_t) user_page_alloc ( new_task->user_pgd_rec );
+        memcpy ( (uint64_t *) user_va_to_phy_addr ( new_task->user_pgd_rec, addr ), (uint64_t *) ( ( ( intptr_t ) ( text_start ) ) + PAGE_SIZE * i ), PAGE_SIZE );
+
+        if ( i == 0 )
+        {
+            ( thread_info->cpu_context ).x[19] = (uint64_t *) addr;
+        }
+    }
+
+    // allocate page for user stack
+    for ( i = 0; i < USER_STACK_SIZE_PER_TASK / PAGE_SIZE; i++ )
+    {
+        addr = (intptr_t) user_page_alloc ( new_task->user_pgd_rec );
+    }
+
     ( thread_info->cpu_context ).lr           = (uint64_t *) default_task_start;
-    ( thread_info->cpu_context ).user_sp      = (uint64_t *) ( new_task->user_stack_ptr );
+    ( thread_info->cpu_context ).user_sp      = (uint64_t *) ( addr + PAGE_SIZE );
     ( thread_info->cpu_context ).kernel_sp    = (uint64_t *) ( new_task->kernel_stack_ptr );
     ( thread_info->cpu_context ).user_mode_pc = (uint64_t *) default_task_start;
 
@@ -70,9 +99,9 @@ thread_info_t * create_thread_info ( void ( *func ) ( ) )
     return thread_info;
 }
 
-int task_create ( void ( *func ) ( ) )
+int task_create ( void * text_start, uint64_t text_size )
 {
-    thread_info_t * new_task = create_thread_info ( func );
+    thread_info_t * new_task = create_thread_info ( text_start, text_size );
 
     if ( new_task == NULL )
         return -1;
@@ -99,7 +128,7 @@ thread_info_t * get_thread_info ( int pid )
 
 thread_info_t * sys_duplicate_task ( thread_info_t * current_task )
 {
-    thread_info_t * new_task = create_thread_info ( current_task->func );
+    thread_info_t * new_task = create_thread_info ( current_task->text_start, current_task->text_size );
 
     if ( new_task == NULL )
         return NULL;
@@ -112,8 +141,10 @@ thread_info_t * sys_duplicate_task ( thread_info_t * current_task )
 
     /* copy cpu_context */
     int i;
+
     /* set the return value as 0 for the child task */
     ( new_task->cpu_context ).x[0] = 0;
+
     /* copy register, start from 1 */
     for ( i = 1; i < 29; i++ )
         ( new_task->cpu_context ).x[i] = ( new_task->cpu_context ).x[i];
@@ -122,7 +153,8 @@ thread_info_t * sys_duplicate_task ( thread_info_t * current_task )
     ( new_task->cpu_context ).user_sp      = ( new_task->user_sp ) - ( current_task->user_sp - ( ( current_task->cpu_context ).user_sp ) ); /* count the offset */
     ( new_task->cpu_context ).kernel_sp    = new_task->kernel_sp;
     ( new_task->cpu_context ).user_mode_pc = ( current_task->cpu_context ).user_mode_pc; /* program counter remain the same */
-    /* copy memory */
+
+    /* copy stack */
     int size = ( uint64_t ) ( (char *) current_task->user_sp - (char *) ( ( current_task->cpu_context ).user_sp ) );
     for ( i = 0; i < size; i++ )
         ( (char *) ( ( new_task->cpu_context ).user_sp ) )[i] = ( (char *) ( ( current_task->cpu_context ).user_sp ) )[i];
